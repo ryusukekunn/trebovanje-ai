@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AI Asistent — Trebovanje | Terme Ozren</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://js.puter.com/v2/"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -541,11 +542,120 @@
     }
     .panel { border-left: none; border-top: 1px solid var(--border); max-height: 340px; }
   }
+
+  /* ── API KEY OVERLAY ── */
+  .key-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(10,9,8,0.92);
+    backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+  }
+  .key-overlay.hidden { display: none; }
+  .key-box {
+    background: var(--surface);
+    border: 1px solid var(--gold-dim);
+    border-radius: 10px;
+    padding: 36px 40px;
+    width: 440px;
+    max-width: 92vw;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+  .key-box-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 22px;
+    color: var(--gold);
+    letter-spacing: 0.03em;
+  }
+  .key-box-desc {
+    font-size: 13.5px;
+    color: var(--text-dim);
+    line-height: 1.65;
+  }
+  .key-box-desc a { color: var(--gold-dim); text-decoration: none; }
+  .key-box-desc a:hover { color: var(--gold); }
+  .key-input-row { display: flex; gap: 8px; }
+  .key-input {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: 'Jost', sans-serif;
+    font-size: 13px;
+    font-weight: 300;
+    padding: 10px 14px;
+    outline: none;
+    letter-spacing: 0.03em;
+    transition: border-color 0.15s;
+  }
+  .key-input:focus { border-color: var(--gold-dim); }
+  .key-input::placeholder { color: var(--text-mute); }
+  .key-save-btn {
+    padding: 10px 18px;
+    background: var(--gold);
+    border: none;
+    border-radius: var(--radius);
+    color: var(--bg);
+    font-family: 'Jost', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: opacity 0.15s;
+  }
+  .key-save-btn:hover { opacity: 0.85; }
+  .key-note {
+    font-size: 11.5px;
+    color: var(--text-mute);
+    line-height: 1.6;
+  }
+  .key-note span { color: var(--green); }
+  .key-btn {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-dim);
+    font-family: 'Jost', sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .key-btn:hover { border-color: var(--gold-dim); color: var(--gold); }
+  .status-dot.no-key { background: #e67e22; box-shadow: 0 0 6px #e67e22; }
 </style>
 </head>
 <body>
 
 <div class="app">
+
+  <!-- API KEY OVERLAY -->
+  <div class="key-overlay" id="keyOverlay">
+    <div class="key-box">
+      <div class="key-box-title">Groq API Ključ</div>
+      <div class="key-box-desc">
+        Unesite vaš besplatni Groq API ključ. Ključ se čuva samo u vašem browseru (localStorage) i nikad se ne šalje nikome osim Groq serveru.<br><br>
+        Dobijte besplatan ključ na <a href="https://console.groq.com/keys" target="_blank">console.groq.com/keys</a> — bez kreditne kartice.
+      </div>
+      <div class="key-input-row">
+        <input class="key-input" type="password" id="keyInput" placeholder="gsk_..." autocomplete="off" onkeydown="if(event.key==='Enter') saveKey()">
+        <button class="key-save-btn" onclick="saveKey()">Spremi</button>
+      </div>
+      <div class="key-note">
+        <span>🔒 Sigurno</span> — ključ se sprema lokalno u vaš browser, nije vidljiv nikome drugom.
+      </div>
+    </div>
+  </div>
 
   <!-- HEADER -->
   <header>
@@ -555,8 +665,9 @@
       <span class="logo-sub">AI Asistent — Trebovanje</span>
     </div>
     <div class="header-meta">
-      <div class="status-dot"></div>
-      <span class="status-label">Aktivan</span>
+      <div class="status-dot" id="statusDot"></div>
+      <span class="status-label" id="statusLabel">Aktivan</span>
+      <button class="key-btn" onclick="showKeyOverlay()" title="Promijeni API ključ">API Ključ</button>
     </div>
   </header>
 
@@ -633,6 +744,43 @@
 // ── STATE ──
 const trebItems = [];
 let isLoading = false;
+let GROQ_API_KEY = '';
+
+// ── API KEY MANAGEMENT ──
+function loadKey() {
+  GROQ_API_KEY = localStorage.getItem('groq_api_key') || '';
+  const overlay = document.getElementById('keyOverlay');
+  const dot = document.getElementById('statusDot');
+  const label = document.getElementById('statusLabel');
+  if (GROQ_API_KEY) {
+    overlay.classList.add('hidden');
+    dot.classList.remove('no-key');
+    label.textContent = 'Aktivan';
+  } else {
+    overlay.classList.remove('hidden');
+    dot.classList.add('no-key');
+    label.textContent = 'Potreban ključ';
+  }
+}
+
+function saveKey() {
+  const val = document.getElementById('keyInput').value.trim();
+  if (!val.startsWith('gsk_') || val.length < 20) {
+    document.getElementById('keyInput').style.borderColor = 'var(--red)';
+    setTimeout(() => document.getElementById('keyInput').style.borderColor = '', 1200);
+    return;
+  }
+  localStorage.setItem('groq_api_key', val);
+  GROQ_API_KEY = val;
+  document.getElementById('keyInput').value = '';
+  loadKey();
+  showToast('API ključ uspješno spremljen ✓');
+}
+
+function showKeyOverlay() {
+  document.getElementById('keyOverlay').classList.remove('hidden');
+  setTimeout(() => document.getElementById('keyInput').focus(), 100);
+}
 
 // ── CHAT ──
 function addMessage(role, content, parsedItems) {
@@ -740,24 +888,38 @@ async function countdown(seconds) {
   updateThinkingText('↻ Pokušavam ponovo...');
 }
 
-async function callPollinations(messages, retryCount = 0) {
-  const response = await fetch('https://text.pollinations.ai/openai', {
+async function callGroq(messages, retryCount = 0) {
+  if (!GROQ_API_KEY) {
+    showKeyOverlay();
+    throw new Error('API ključ nije postavljen.');
+  }
+
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${GROQ_API_KEY}`
+    },
     body: JSON.stringify({
-      model: 'openai',
+      model: 'llama-3.3-70b-versatile',
       messages: messages,
-      seed: 42,
-      private: true
+      max_tokens: 1000,
+      temperature: 0.3
     })
   });
 
   if (response.status === 429) {
-    if (retryCount >= 3) throw new Error('Server je preopterećen. Pokušaj za koji minut.');
-    // Wait 16s on first retry, 20s on second, 25s on third
-    const waitSec = [16, 20, 25][retryCount];
+    if (retryCount >= 3) throw new Error('Previše zahtjeva. Pokušajte za minutu.');
+    const waitSec = [10, 20, 30][retryCount];
     await countdown(waitSec);
-    return callPollinations(messages, retryCount + 1);
+    return callGroq(messages, retryCount + 1);
+  }
+
+  if (response.status === 401) {
+    localStorage.removeItem('groq_api_key');
+    GROQ_API_KEY = '';
+    loadKey();
+    throw new Error('API ključ nije ispravan. Unesite novi ključ.');
   }
 
   if (!response.ok) {
@@ -786,7 +948,7 @@ async function sendMessage() {
       { role: 'user', content: text }
     ];
 
-    const data = await callPollinations(messages);
+    const data = await callGroq(messages);
     removeThinking();
 
     if (data.error) {
@@ -978,6 +1140,9 @@ function showToast(msg) {
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2200);
 }
+
+// Init
+loadKey();
 </script>
 </body>
 </html>
