@@ -533,14 +533,24 @@
   @media (max-width: 900px) {
     .app {
       grid-template-columns: 1fr;
-      grid-template-rows: auto 1fr auto auto;
+      grid-template-rows: auto auto auto 1fr auto;
       grid-template-areas:
         "header"
+        "panel"
         "chat"
-        "input"
-        "panel";
+        "chat"
+        "input";
+      height: auto;
+      min-height: 100vh;
     }
-    .panel { border-left: none; border-top: 1px solid var(--border); max-height: 340px; }
+    .chat-area { min-height: 300px; max-height: 45vh; }
+    .panel {
+      border-left: none;
+      border-bottom: 1px solid var(--border);
+      max-height: none;
+      height: auto;
+    }
+    .items-list { max-height: 280px; }
   }
 
   /* ── API KEY OVERLAY ── */
@@ -1004,7 +1014,7 @@ Kada korisnik opisuje šta mu treba, OBAVEZNO vrati JSON u ovom formatu na kraju
 </STAVKE>
 
 Za polje "dobavljac" koristi tačno ime dobavljača iz ove liste — odaberi najlogičnijeg dobavljača na osnovu vrste artikla:
-Bolero (pića, kafe, sokovi, alkohol), Gatarić (ambalaža, potrošni materijal), ZP Komerc (razno), Sara (razno prehrambeno), Madi (meso, perad), Menprom (meso, perad), Monopson (voće, povrće), Đurić (kolači, peciva, prehrambeno), Ledo (smrznuti program), Sićko Prom (hemija, higijena), Violeta (higijena, papir), Velvet Trade (razno), Džajić Commerce (prehrambeno suho), Edo Slad (kolači, slastice), San Marco (kolači, torte), Fructa Trade (mlijeko, ulje), Europapier (papir, higijena), Pađeni (mliječni proizvodi), Meggle (mliječni), Fine Food (smrznuti), Andrea & Giovanni (razno), Bili Brig (sokovi, pića), Delfin (razno), Donex (razno), MCI (razno), Biss Glass (staklo, ambalaza), GBS Pack (ambalaža), Sićko (hemija).
+Bolero (pića, kafe, sokovi, alkohol), Gatarić (ambalaža, potrošni materijal), ZP Komerc (razno), Sara (razno prehrambeno), Madi (meso, perad), Menprom (meso, perad), Monopson (voće, povrće), Đurić (kolači, peciva, prehrambeno), Ledo (smrznuti program), Sićko Prom (hemija, higijena), Violeta (higijena, papir), Velvet Trade (razno), Džajić Commerce (prehrambeno suho), Edo Slad (kolači, slastice), San Marco (kolači, torte), Fructa Trade (mlijeko, ulje), Europapier (papir, higijena), Pađeni (mliječni proizvodi), Meggle (mliječni), Fine Food (smrznuti), Andrea & Giovanni (razno), Bili Brig (sokovi, pića), Delfin (razno), Donex (razno), MCI (razno), Biss Glass (staklo, ambalaza), GBS Pack (ambalaža), Sićko / Sićko Prom (prehrambeni artikli, suho, konzerve, začini).
 Ako artikal nije jasan, koristi "Ostalo".
 
 Ako nisi siguran za jedinicu mjere, koristi "kom".
