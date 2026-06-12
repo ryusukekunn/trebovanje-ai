@@ -1030,12 +1030,75 @@ function matchDobavljacIzBaze(naziv) {
   return null; // nije nađeno — ostavljamo AI dobavljača
 }
 
-function fixDobavljaci(items) {
+// Normalizacija dobavljača iz teksta koji korisnik upiše
+// npr. "ZP Komerca", "ZP Komerce", "Menproma", "od Sare" -> tačno ime
+function normalizujDobavljacaIzTeksta(raw) {
+  if (!raw) return null;
+  const r = raw.toLowerCase().trim();
+  // Map varijanti na tačna imena
+  const ALIASES = {
+    'zp komerc': 'ZP Komerc', 'zp komerca': 'ZP Komerc', 'zp komerce': 'ZP Komerc',
+    'sara': 'Sara', 'sare': 'Sara', 'saru': 'Sara',
+    'menprom': 'Menprom', 'menproma': 'Menprom', 'menpromu': 'Menprom',
+    'madi': 'Madi', 'madija': 'Madi', 'madiju': 'Madi',
+    'gatarić': 'Gatarić', 'gatarica': 'Gatarić', 'gataric': 'Gatarić',
+    'bolero': 'Bolero', 'bolera': 'Bolero', 'boleru': 'Bolero',
+    'sićko prom': 'Sićko Prom', 'sicko prom': 'Sićko Prom', 'sićka': 'Sićko Prom', 'sićko': 'Sićko',
+    'ledo': 'Ledo', 'leda': 'Ledo', 'ledu': 'Ledo',
+    'violeta': 'Violeta', 'viole': 'Violeta',
+    'džajić': 'Džajić Commerce', 'dzajic': 'Džajić Commerce', 'džajić commerce': 'Džajić Commerce',
+    'bambi': 'Bambi', 'bambija': 'Bambi',
+    'bili brig': 'Bili Brig', 'bili briga': 'Bili Brig',
+    'delfin': 'Delfin', 'delfina': 'Delfin',
+    'đurić': 'Đurić', 'djuric': 'Đurić', 'đurića': 'Đurić',
+    'pađeni': 'Pađeni', 'padeni': 'Pađeni',
+    'meggle': 'Meggle', 'megle': 'Meggle',
+    'velvet': 'Velvet Trade', 'velvet trade': 'Velvet Trade',
+    'europapier': 'Europapier',
+    'monopson': 'Sićko Prom',
+    'west': 'West',
+    'yimor': 'Yimor',
+    'briž': 'Briž', 'briz': 'Briž',
+    'soča': 'Soča', 'soca': 'Soča',
+    'donex': 'Donex',
+    'fructa': 'Fructa Trade', 'fructa trade': 'Fructa Trade',
+    'mik company': 'MIK Company', 'mik': 'MIK Company',
+    'mci': 'MCI',
+    'mg lotus': 'MG Lotus',
+    'almako': 'Almako',
+    'andrea': 'Andrea & Giovanni', 'andrea giovanni': 'Andrea & Giovanni',
+    'edo slad': 'Edo Slad', 'edo': 'Edo Slad',
+    'san marco': 'San Marco',
+    'rakić komerc': 'Rakić Komerc', 'rakic': 'Rakić Komerc',
+    'variplast': 'Variplast',
+    'zeka komerc': 'Zeka Komerc', 'zeka': 'Zeka Komerc',
+  };
+  // Direct alias lookup
+  if (ALIASES[r]) return ALIASES[r];
+  // Partial: find alias that's contained in r
+  for (const [alias, name] of Object.entries(ALIASES)) {
+    if (r.includes(alias)) return name;
+  }
+  // Try matching against DOBAVLJACI_LISTA directly
+  const match = DOBAVLJACI_LISTA.find(d => r.includes(d.toLowerCase()) || d.toLowerCase().includes(r));
+  return match || null;
+}
+
+function fixDobavljaci(items, explicitDobavljac) {
   return items.map(item => {
-    const fromBaza = matchDobavljacIzBaze(item.naziv);
-    if (fromBaza) {
-      return { ...item, dobavljac: fromBaza };
+    // 1. Eksplicitni dobavljač iz teksta ima NAJVIŠI prioritet
+    if (item.dobavljac_explicit) {
+      const norm = normalizujDobavljacaIzTeksta(item.dobavljac_explicit);
+      if (norm) return { ...item, dobavljac: norm };
     }
+    // 2. Globalni eksplicitni dobavljač (korisnik rekao "od ZP Komerca sve")
+    if (explicitDobavljac) {
+      return { ...item, dobavljac: explicitDobavljac };
+    }
+    // 3. Match iz baze
+    const fromBaza = matchDobavljacIzBaze(item.naziv);
+    if (fromBaza) return { ...item, dobavljac: fromBaza };
+    // 4. AI dobavljač kao fallback
     return item;
   });
 }
@@ -1050,10 +1113,12 @@ Kada korisnik opisuje šta mu treba, OBAVEZNO vrati JSON u ovom formatu na kraju
 
 <STAVKE>
 [
-  {"naziv": "naziv artikla", "kolicina": broj, "jedinica": "l/kg/kom/pak/boca/...", "dobavljac": "naziv dobavljača"},
+  {"naziv": "naziv artikla", "kolicina": broj, "jedinica": "l/kg/kom/pak/boca/...", "dobavljac": "naziv dobavljača", "dobavljac_explicit": "ako korisnik EKSPLICITNO navede dobavljača u tekstu, stavi ga ovdje, inače null"},
   ...
 ]
 </STAVKE>
+
+VAŽNO: Ako korisnik kaže "od ZP Komerca 10kg svinjske plećke" ili "od Menproma 30 juneće plećke" ili slično — stavi eksplicitno navedenog dobavljača u polje "dobavljac_explicit". Ako dobavljač NIJE eksplicitno naveden, ostavi "dobavljac_explicit": null.
 
 Za polje "dobavljac" koristi TAČNO ime dobavljača iz tabele. Biraj dobavljača čiji artikli TAČNO odgovaraju traženom — ako je artikal u listi, koristi tog dobavljača:
 - A&G: Blitva, Carsko povrće, Pekarski, Pomfrit, Povrće za rusku
@@ -1212,8 +1277,8 @@ async function sendMessage() {
     if (match) {
       try {
         parsedItems = JSON.parse(match[1].trim());
-        // Override AI dobavljač sa tačnim iz baze gdje je moguće
-        if (parsedItems) parsedItems = fixDobavljaci(parsedItems);
+        // Override AI dobavljač: eksplicitni iz teksta > baza > AI
+        if (parsedItems) parsedItems = fixDobavljaci(parsedItems, null);
       } catch(e) { parsedItems = null; }
     }
 
